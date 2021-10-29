@@ -1,7 +1,6 @@
 import flask
 from flask import request, jsonify
 import os
-from cert_tools import create_v2_certificate_template, create_v2_issuer, instantiate_v2_certificate_batch #maybe not needed
 from configparser import ConfigParser
 import json
 import pandas
