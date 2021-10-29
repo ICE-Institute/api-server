@@ -7,6 +7,8 @@ import pandas
 import subprocess
 import fnmatch
 import shutil
+from distutils.dir_util import copy_tree
+
 
 """
 This API server is made according to "Koa cert generation feature_sample" referencing the 4 main api used there:
@@ -69,7 +71,7 @@ def create_group():
         issuer_conf.write(f)
 
     try:
-        run_create_issuer = subprocess.run(['python3','cert-tools/cert_tools/create_v2_issuer.py','-c','cert-tools/issuer_conf.ini'], capture_output=True) #runs the create_v2_issuer.py
+        run_create_issuer = subprocess.run(['python3','cert-tools/cert_tools/create_v2_issuer.py','-c','cert-tools/issuer_conf.ini']) #runs the create_v2_issuer.py
     except:
         return jsonify({"msg":"error creating issuer id"})
     ######################
@@ -105,7 +107,7 @@ def create_group():
 
     #run the create-certificate-template
     try:
-        run_cert_tools = subprocess.run(['create-certificate-template','-c','cert-tools/conf.ini'], capture_output=True) #can add '-c','myconf.ini' after 'create_certificate_template' to the conf file if this failed
+        run_cert_tools = subprocess.run(['create-certificate-template','-c','cert-tools/conf.ini']) #can add '-c','myconf.ini' after 'create_certificate_template' to the conf file if this failed
         msg="Create template succeeded!"
     except Exception as e:
         msg="error creating template; "
@@ -179,7 +181,7 @@ def search_group():
             'design_id': None,
             'blockchain': True,
             'certificate_design_id': 23,
-            'badge_design_id': identity,
+            'badge_design_id': identity.split(":")[2],
             'department_id': None,
         }
     }
@@ -218,9 +220,9 @@ def create_certificate():
 
     cert_conf = ConfigParser()
     cert_conf.read("cert-tools/conf.ini")
-    group_id = str(data["credential"]["group_id"]).lower()+'.json' #format is "group name(issuer)"_"course name"
+    group_id = str(data["credential"]["group_id"]).lower() #format is "group name(issuer)"_"course name"
     #cert_conf.set("instantiate batch config","roster","rosters/mainnet.csv")
-    cert_conf.set("template data","template_file_name",group_id)
+    cert_conf.set("template data","template_file_name",group_id+'.json')
     #unsigned_dir_temp = os.path.join(dir_path,unsigned_dir)
     with open('cert-tools/conf.ini', 'w') as f:
         cert_conf.write(f)
@@ -239,12 +241,15 @@ def create_certificate():
     #create certificate from csv
     try:
 
-        run_cert_tools = subprocess.run(['instantiate-certificate-batch','-c','cert-tools/conf.ini'], capture_output=True) #can add '-c','myconf.ini' after 'instantiate-certificate-batch' to the conf file if this failed
+        run_cert_tools = subprocess.run(['instantiate-certificate-batch','-c','cert-tools/conf.ini']) #can add '-c','myconf.ini' after 'instantiate-certificate-batch' to the conf file if this failed
         print("instantiate succeed!")
         unsigned_dir_temp = dir_path+'/cert-tools/'+str(cert_conf["template data"]["data_dir"])+"/"+str(cert_conf["instantiate batch config"]["unsigned_certificates_dir"])
-
-        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-issuer/data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-issuer folder to be proccessed
-        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-tools/sample_data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-tools folder for storage
+        """
+        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-issuer/data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-issuer folder to be proccessed, only in python 3.8+ :(
+        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-tools/sample_data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-tools folder for storage, only in python 3.8+
+        """
+        copy_tree(str(unsigned_dir_temp), str(dir_path)+'/cert-issuer/data/unsigned_certificates')
+        copy_tree(str(unsigned_dir_temp),str(dir_path)+"/cert-tools/sample_data/unsigned_certificates")
         print("copy succeed")
 
         #this function deletes the content of temp folder
@@ -266,7 +271,7 @@ def create_certificate():
 
     #this function below issues the certificate automatically to cert-issuer
     try:
-        run_cert_issuer = subprocess.run(['cert-issuer','-c','cert-issuer/conf.ini'], capture_output=True)
+        run_cert_issuer = subprocess.run(['cert-issuer','-c','cert-issuer/conf.ini'])
         print("success issuing!")
         #this function deletes unsigned certificates in cert-issuer (issue to blockchain from the folder specified in cert-issuer/conf.ini). Because of how cert-issuer read from unsigned_certificates every issuing, this folder needs to be cleaned so previously signed certificate not get issued again
         folder = os.path.join(dir_path,'cert-issuer/data/unsigned_certificates')
@@ -284,10 +289,10 @@ def create_certificate():
 
     #find the newly created blockchain certificate
     recipient_name_return = recipient_email.replace("@","").replace(".","")
-    course_name_return = group_id.split('+')[1]
+    course_name_return = group_id.split('+')[1].replace("_","")
     #course_name_return = course_name_return.split('_')[1]
     blockchain_file = course_name_return+recipient_name_return+".json"
-    blockchain_file = blockchain_file.replace(" ","")
+    #blockchain_file = blockchain_file.replace(" ","")
     folder = os.path.join(dir_path,'cert-issuer/data/blockchain_certificates')
     try:
         for filename in os.listdir(folder):
