@@ -51,14 +51,12 @@ def create_group():
     else:
         return jsonify({"msg":"data does not have content type application/json!"})
 
-    #setting for create_issuer.py
-    #currently creates new issuer everytime making new group. Should be create issuer only if issuer doesn't exist
     issuer_id_output = "cert-tools/sample_data/issuer_id/"+str(data["group"]["name"]).replace(" ","_")+".json"
-    issuer_id_url=  "https://jsonkeeper.com/b/68HG" #this is uploaded manually. It should be automatically uploaded after issuer is created
+    issuer_id_url=  "http://localhost:5000/static/edx.json"
     issuer_pubkey = str(data["group"]["meta_data"]["issuer_pub_key"]).lower() #pubkey in cert-tools config file needs to be lower as cert-verifier will fail to check if not. There's a problem in the cert-verifier library that parse the issuer_id pubkey and cert template pubkey as all lowercase. 3 years passed and this bug is still documented as open and unfixed in the github.
 
-    #this below might not be needed if the issuer is only 1 organization
-    #####################
+    #this below might not be needed if the issuer is only 1 organization (generate sendiri nanti sesuai dari website icei + gambar mereka)
+    """
     issuer_conf = ConfigParser()
     issuer_conf.read("cert-tools/issuer_conf.ini")
     issuer_conf.set("configurations","issuer_public_key","ecdsa-koblitz-pubkey:"+issuer_pubkey) #blockchain address for issuing
@@ -74,7 +72,7 @@ def create_group():
         run_create_issuer = subprocess.run(['python3','cert-tools/cert_tools/create_v2_issuer.py','-c','cert-tools/issuer_conf.ini']) #runs the create_v2_issuer.py
     except:
         return jsonify({"msg":"error creating issuer id"})
-    ######################
+    """
 
 
     #this function writes the data from api call to conf.ini file
@@ -99,6 +97,7 @@ def create_group():
     #currently, the template_file_name is the group id
     template_file_name = str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
     #template_file_name = str(data["group"]["id"])+'.json'
+    #template file name should look like this course-v1:UNSx+MS12304-20B+2021.1
     cert_conf.set("template data","template_file_name",template_file_name+'.json') #this is set as group name_course name.json. Formatting can be changed
 
     #write the conf in cert-tools/conf.ini
@@ -215,8 +214,9 @@ def create_certificate():
 
     #below is for creating certificate
     #EVERY detailed configuration can be seen in conf.ini file (in cert-tools folder or from github). link to cert-tools github https://github.com/blockchain-certificates/cert-tools
-    if 'name' not in data["credential"]["recipient"] or 'email' not in data["credential"]["recipient"] or 'pubkey' not in data["credential"]["recipient"]["meta_data"]:
+    if 'name' not in data["credential"]["recipient"] or 'email' not in data["credential"]["recipient"]:
         return jsonify ({"msg":"missing name, email in credential recipient and/or pubkey in credential meta_data"})
+
 
     cert_conf = ConfigParser()
     cert_conf.read("cert-tools/conf.ini")
@@ -230,7 +230,10 @@ def create_certificate():
     recipient=[]
     recipient_name=str(data["credential"]["recipient"]["name"])
     recipient_email=str(data["credential"]["recipient"]["email"])
-    recipient_pubkey="ecdsa-koblitz-pubkey:"+str(data["credential"]["recipient"]["meta_data"]["pubkey"]) #uses pubkey POSTed in recipient
+    if 'pubkey' not in data["credential"]["recipient"]["meta_data"]:
+        recipient_pubkey = "ecdsa-koblitz-pubkey: 0x88D2a0D90B290d7233045E364501F9DD8B3680Cf"
+    else:
+        recipient_pubkey="ecdsa-koblitz-pubkey:"+str(data["credential"]["recipient"]["meta_data"]["pubkey"]) #uses pubkey POSTed in recipient
 
     recipient_temp=[recipient_name,recipient_pubkey,recipient_email]
     recipient.append(recipient_temp)
@@ -289,9 +292,10 @@ def create_certificate():
 
     #find the newly created blockchain certificate
     recipient_name_return = recipient_email.replace("@","").replace(".","")
+    recipient_name_return_sanitize = ''.join(e for e in recipient_name_return if e.isalnum())
     course_name_return = group_id.split('+')[1].replace("_","")
     #course_name_return = course_name_return.split('_')[1]
-    blockchain_file = course_name_return+recipient_name_return+".json"
+    blockchain_file = course_name_return+recipient_name_return_sanitize+".json"
     #blockchain_file = blockchain_file.replace(" ","")
     folder = os.path.join(dir_path,'cert-issuer/data/blockchain_certificates')
     try:
@@ -402,6 +406,8 @@ def search_credential():
     if "group_id" in data:
         group_id = data["group_id"]
         group_id = group_id+'*.json'
+    else:
+        group_id=""
     blockchain_cert_dir = os.path.join(dir_path,"cert-issuer/data/blockchain_certificates") #this can be changed to use the dir path in conf.ini
     print (blockchain_cert_dir)
     blockchain_cert_data={
@@ -410,7 +416,7 @@ def search_credential():
     for x in os.listdir(blockchain_cert_dir):
         filename=x.lower()
         print(filename)
-        if group_id:
+        if group_id!="":
             if fnmatch.fnmatch(filename,recipient_email) and fnmatch.fnmatch(filename,group_id):
                 file_dir = blockchain_cert_dir+"/"+x
                 print (file_dir)
@@ -428,7 +434,7 @@ def search_credential():
                     "course_link": None,
                     "custom_attributes": None,
                     "expired_on": None,
-                    "group_name": str(data["issuer"]["name"]),
+                    "group_name": str(data["badge"]["issuer"]["name"]),
                     "private": False,
                     "recipient": {
                         "name": str(data["recipientProfile"]["name"]),
@@ -453,7 +459,7 @@ def search_credential():
                 print(file_dir)
                 with open(file_dir,'r') as f:
                     data=json.load(f)
-                formating = {
+                formatting = {
                     "id": str(data["id"]),
                     "name": str(data["badge"]["name"]),
                     "description": str(data["badge"]["description"]),
