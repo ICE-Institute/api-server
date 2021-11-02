@@ -3,7 +3,7 @@
     "https://w3id.org/openbadges/v2",
     "https://w3id.org/blockcerts/v2"
   ],
-  "id": "http://localhost:5000/static/binus.json",
+  "id": "http://localhost:80/static/binus.json",
   "url": "https://binus.icei.ac.id/",
   "name": "Binus University",
   "email": "",
