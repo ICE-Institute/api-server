@@ -248,10 +248,10 @@ def create_certificate():
     recipient=[]
     recipient_name=str(data["credential"]["recipient"]["name"])
     recipient_email=str(data["credential"]["recipient"]["email"])
-    if 'pubkey' not in data["credential"]["recipient"]["meta_data"]:
-        recipient_pubkey = "ecdsa-koblitz-pubkey: 0x88D2a0D90B290d7233045E364501F9DD8B3680Cf"
-    else:
-        recipient_pubkey="ecdsa-koblitz-pubkey:"+str(data["credential"]["recipient"]["meta_data"]["pubkey"]) #uses pubkey POSTed in recipient
+    #if 'pubkey' not in data["credential"]["recipient"]["meta_data"]:
+    recipient_pubkey = "ecdsa-koblitz-pubkey: 0x88D2a0D90B290d7233045E364501F9DD8B3680Cf"
+    #else:
+    #    recipient_pubkey="ecdsa-koblitz-pubkey:"+str(data["credential"]["recipient"]["meta_data"]["pubkey"]) #uses pubkey POSTed in recipient
 
     recipient_temp=[recipient_name,recipient_pubkey,recipient_email]
     recipient.append(recipient_temp)
@@ -329,7 +329,7 @@ def create_certificate():
         return jsonify({"msg":"cannot find blockchain certificates / Error when issuing certificate!"})
     return_data = {
         "credential": {
-            "id": str(return_json["id"]),
+            "id": str(return_json["id"]).split(":")[2],
             "name": str(return_json["badge"]["name"]),
             "description": str(return_json["badge"]["description"]),
             "approve": True,
@@ -440,8 +440,8 @@ def search_credential():
                 print (file_dir)
                 with open(file_dir,'r') as f:
                    data=json.load(f)
-                formating = {
-                    "id": str(data["id"]),
+                formatting = {
+                    "id": str(data["id"]).split(':')[2],
                     "name": str(data["badge"]["name"]),
                     "description": str(data["badge"]["description"]),
                     "grade": None,
@@ -467,7 +467,6 @@ def search_credential():
                         "url": "http://www.accredible.com"
                     },
                     "meta_data": {
-                        "foo": "bar"
                     }
                 }
                 blockchain_cert_data["credentials"].append(formatting)
@@ -478,7 +477,7 @@ def search_credential():
                 with open(file_dir,'r') as f:
                     data=json.load(f)
                 formatting = {
-                    "id": str(data["id"]),
+                    "id": str(data["id"]).split(':')[2],
                     "name": str(data["badge"]["name"]),
                     "description": str(data["badge"]["description"]),
                     "grade": None,
@@ -504,7 +503,6 @@ def search_credential():
                         "url": "http://www.accredible.com"
                     },
                     "meta_data": {
-                        "foo": "bar"
                     }
                 }
                 blockchain_cert_data["credentials"].append(formatting)
