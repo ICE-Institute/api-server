@@ -177,7 +177,7 @@ def search_group():
                 course_link = str(group_json["badge"]["issuer"]["url"])
                 groups_list={
                     'id': cert_id.split('.')[0],
-                    'name': name,
+                    'name': filename.split('.')[0],
                     'course_description': course_description,
                     'course_name': course_name,
                     'learning_outcomes': None,
