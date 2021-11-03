@@ -52,8 +52,10 @@ def create_group():
         return jsonify({"msg":"data does not have content type application/json!"})
 
     issuer_id_output = "cert-tools/sample_data/issuer_id/"+str(data["group"]["name"]).replace(" ","_")+".json"
-    issuer_id_url=  "http://localhost:5000/static/edx.json"
-    issuer_pubkey = str(data["group"]["meta_data"]["issuer_pub_key"]).lower() #pubkey in cert-tools config file needs to be lower as cert-verifier will fail to check if not. There's a problem in the cert-verifier library that parse the issuer_id pubkey and cert template pubkey as all lowercase. 3 years passed and this bug is still documented as open and unfixed in the github.
+    group_name = str(data['group']['name'])
+    #issuer_id_url=  "http://localhost:5000/static/"+group_name+".json"
+    issuer_id_url = "http://localhost:80/static/edx.json"
+    issuer_pubkey = "0x88D2a0D90B290d7233045E364501F9DD8B3680Cf".lower() #pubkey in cert-tools config file needs to be lower as cert-verifier will fail to check if not. There's a problem in the cert-verifier library that parse the issuer_id pubkey and cert template pubkey as all lowercase. 3 years passed and this bug is still documented as open and unfixed in the github.
 
     #this below might not be needed if the issuer is only 1 organization (generate sendiri nanti sesuai dari website icei + gambar mereka)
     """
@@ -95,7 +97,7 @@ def create_group():
     #cert_conf.set("certificate information","badge_id",str(data["group"]["department_id"])) #dont know what to input. This is required by cert-tools, currently set to default from the blockcerts github
 
     #currently, the template_file_name is the group id
-    template_file_name = str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
+    template_file_name = "course-v1:"+str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
     #template_file_name = str(data["group"]["id"])+'.json'
     #template file name should look like this course-v1:UNSx+MS12304-20B+2021.1
     cert_conf.set("template data","template_file_name",template_file_name+'.json') #this is set as group name_course name.json. Formatting can be changed
@@ -115,7 +117,7 @@ def create_group():
     with open(dir_path+"/cert-tools/"+cert_conf["template data"]["data_dir"]+"/"+cert_conf["template data"]["template_dir"]+"/"+template_file_name+'.json', 'r') as f:
         return_json = json.load(f)
     value ={
-        "group": {
+        "groups": {
             "id": template_file_name,
             "name": str(return_json["badge"]["issuer"]["name"]),
             "course_description": str(return_json["badge"]["description"]),
@@ -134,7 +136,6 @@ def create_group():
             "badge_design_id": str(return_json["badge"]["id"]).split(":")[2],
             "department_id": None,
             "meta_data": {
-                "foo": "bar"
             }
         }
     }
@@ -149,41 +150,58 @@ def search_group():
         return jsonify({"msg":"data does not have content type application/json!"})
 
     #loads data from cert templates to convert it accordingly to what accredible returns. currently format of name variable is: group name_course name
-    cert_id = str(data["name"]).lower()
+    cert_id = str(data["name"]).lower()+'.json'
     #print (name)
+
+    group = {
+        'groups':[]
+        }
+
     try:
-        with open('cert-tools/sample_data/certificate_templates/'+cert_id+'.json', 'r') as myfile:
-            group_data = myfile.read()
-        group_json=json.loads(group_data)
+        #with open('cert-tools/sample_data/certificate_templates/'+cert_id+'.json', 'r') as myfile:
+            #group_data = myfile.read()
+        #group_json=json.loads(group_data)
+        folder = dir_path+'/cert-tools/sample_data/certificate_templates/'
+        print (folder)
+        for filename in os.listdir(folder):
+            file_path = os.path.join(folder,filename)
+            if cert_id == filename.lower():
+                cert_path = file_path
+                print (cert_path)
+                with open(cert_path, 'r') as f:
+                    group_json = json.load(f)
+                identity = str(group_json["badge"]["id"])
+                name = str(group_json["badge"]["issuer"]["name"])
+                course_description=str(group_json["badge"]["description"])
+                course_name=str(group_json["badge"]["name"])
+                course_link = str(group_json["badge"]["issuer"]["url"])
+                groups_list={
+                    'id': cert_id.split('.')[0],
+                    'name': name,
+                    'course_description': course_description,
+                    'course_name': course_name,
+                    'learning_outcomes': None,
+                    'attach_pdf': False,
+                    'course_link': course_link,
+                    'language': "en",
+                    'design_name': None,
+                    'updated_at': None,
+                    'created_at': None,
+                    'design_id': None,
+                    'blockchain': True,
+                    'certificate_design_id': 23,
+                    'badge_design_id': identity.split(":")[2],
+                    'department_id': None,
+                }
+                group['groups'].append(groups_list)
+
     except:
         return jsonify({"msg":"No group data exist!"})
 
+
+
     #this returns 1 result only
-    identity = str(group_json["badge"]["id"])
-    name = str(group_json["badge"]["issuer"]["name"])
-    course_description=str(group_json["badge"]["description"])
-    course_name=str(group_json["badge"]["name"])
-    course_link = str(group_json["badge"]["issuer"]["url"])
-    group = {
-        'group':{
-            'id': cert_id,
-            'name': name,
-            'course_description': course_description,
-            'course_name': course_name,
-            'learning_outcomes': None,
-            'attach_pdf': False,
-            'course_link': course_link,
-            'language': "en",
-            'design_name': None,
-            'updated_at': None,
-            'created_at': None,
-            'design_id': None,
-            'blockchain': True,
-            'certificate_design_id': 23,
-            'badge_design_id': identity.split(":")[2],
-            'department_id': None,
-        }
-    }
+
     return jsonify(group)
 
 #This api create certificate in cert-tools and issue it automatically to blockchain. Writing the blockchain config is not yet made/not neccessary if issuer is only 1
