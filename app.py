@@ -54,7 +54,7 @@ def create_group():
     issuer_id_output = "cert-tools/sample_data/issuer_id/"+str(data["group"]["name"]).replace(" ","_")+".json"
     group_name = str(data['group']['name'])
     #issuer_id_url=  "http://localhost:5000/static/"+group_name+".json"
-    issuer_id_url = "http://localhost:80/static/edx.json"
+    issuer_id_url = "http://localhost:5000/static/edx.json"
     issuer_pubkey = "0x88D2a0D90B290d7233045E364501F9DD8B3680Cf".lower() #pubkey in cert-tools config file needs to be lower as cert-verifier will fail to check if not. There's a problem in the cert-verifier library that parse the issuer_id pubkey and cert template pubkey as all lowercase. 3 years passed and this bug is still documented as open and unfixed in the github.
 
     #this below might not be needed if the issuer is only 1 organization (generate sendiri nanti sesuai dari website icei + gambar mereka)
@@ -119,7 +119,7 @@ def create_group():
     value ={
         "groups": {
             "id": template_file_name,
-            "name": str(return_json["badge"]["issuer"]["name"]),
+            "name": template_file_name,
             "course_description": str(return_json["badge"]["description"]),
             "course_name": str(return_json["badge"]["name"]),
             "learning_outcomes": [
@@ -238,7 +238,7 @@ def create_certificate():
 
     cert_conf = ConfigParser()
     cert_conf.read("cert-tools/conf.ini")
-    group_id = str(data["credential"]["group_id"]).lower() #format is "group name(issuer)"_"course name"
+    group_id = str(data["credential"]["group_id"]).lower()
     #cert_conf.set("instantiate batch config","roster","rosters/mainnet.csv")
     cert_conf.set("template data","template_file_name",group_id+'.json')
     #unsigned_dir_temp = os.path.join(dir_path,unsigned_dir)
