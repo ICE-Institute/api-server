@@ -1,5 +1,5 @@
 import flask
-from flask import request, jsonify
+from flask import request, jsonify, send_from_directory
 import os
 from configparser import ConfigParser
 import json
@@ -419,11 +419,12 @@ def search_credential():
     if 'email' not in data["recipient"]:
         return jsonify({"msg":"missing email in recipient"})
     recipient_email = str(data["recipient"]["email"]).replace('@','').replace('.','')
-    recipient_email = '*'+recipient_email+'.json'
+    recipient_email_match = '*'+recipient_email+'.json'
     #print (recipient_email)
     if "group_id" in data:
-        group_id = data["group_id"]
-        group_id = group_id+'*.json'
+        group_id = str(data["group_id"])
+        group_id_match = group_id+'*.json'
+        course_name = group_id.split('+')[1]
     else:
         group_id=""
     blockchain_cert_dir = os.path.join(dir_path,"cert-issuer/data/blockchain_certificates") #this can be changed to use the dir path in conf.ini
@@ -431,11 +432,14 @@ def search_credential():
     blockchain_cert_data={
             "credentials":[]
         }
+
+    cert_id = course_name+recipient_email+'.json'
+
     for x in os.listdir(blockchain_cert_dir):
         filename=x.lower()
         print(filename)
         if group_id!="":
-            if fnmatch.fnmatch(filename,recipient_email) and fnmatch.fnmatch(filename,group_id):
+            if cert_id==filename:
                 file_dir = blockchain_cert_dir+"/"+x
                 print (file_dir)
                 with open(file_dir,'r') as f:
@@ -471,7 +475,7 @@ def search_credential():
                 }
                 blockchain_cert_data["credentials"].append(formatting)
         else:
-            if fnmatch.fnmatch(filename,recipient_email):
+            if fnmatch.fnmatch(filename,recipient_email_match):
                 file_dir = blockchain_cert_dir+"/"+x
                 print(file_dir)
                 with open(file_dir,'r') as f:
@@ -509,6 +513,23 @@ def search_credential():
 
     return jsonify(blockchain_cert_data)
 
+#this api shows certificate by json as blockcert doesn't generate pdf
+@app.route('/api/v1/credentials/generate_single_pdf/<cert_id>', methods=['POST'])
+def generate_pdf(cert_id):
+    if  request.is_json:
+        #cert_dir = dir_path+'/cert-issuer/data/blockchain_certificates/'+cert_id+'.json'
+        return_data = {
+            "file":"localhost:5000/blockchain_certificates/"+cert_id+'.json'
+        }
+    else:
+        return jsonify({"err": "Content type is not json."})
+    return jsonify(return_data)
+
+@app.route('/blockchain_certificates/<path:filename>')
+def send_certificates(filename):
+    my_dir = str(dir_path)+"/cert-issuer/data/blockchain_certificates"
+    print (my_dir)
+    return send_from_directory(my_dir,filename)
 
 
 if __name__ == "__main__":
