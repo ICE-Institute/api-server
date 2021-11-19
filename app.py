@@ -1,5 +1,6 @@
 import flask
-from flask import request, jsonify, send_from_directory
+from flask import request, jsonify, send_from_directory, make_response
+from flask_cors import CORS, cross_origin
 import os
 from configparser import ConfigParser
 import json
@@ -8,6 +9,8 @@ import subprocess
 import fnmatch
 import shutil
 from distutils.dir_util import copy_tree
+import requests as req
+import gzip
 
 
 """
@@ -33,7 +36,73 @@ dir_path=os.path.abspath(os.getcwd())
 
 
 app = flask.Flask(__name__)
+
 app.config["DEBUG"] = True
+
+@app.route('/issuer_id/<issuer_id>',methods=['GET'])
+@cross_origin()
+def send_issuerId(issuer_id):
+    my_dir = str(dir_path)+"/static"
+    print (my_dir)
+    return send_from_directory(my_dir,issuer_id)
+
+@app.route('/api/v1/viewer/<transaction_id>',methods=['GET'])
+@cross_origin()
+def view(transaction_id):
+    tx_id = transaction_id
+    data_request = request
+    print(data_request)
+    my_headers = {'Authorization' : ''}
+    get_data = req.get(""+tx_id,headers=my_headers)
+    #print (get_data.json())
+    response = get_data.json()
+    #response_obj = response.loads(response)
+
+    '''
+    data = {
+        "jsonrpc":"2.0",
+        "id":1,
+        "result":{
+            "blockHash":str(response["blockHash"]),
+            "blockNumber":str(response["blockNumber"]),
+            "from":str(response["from"]),
+            "gas":"",
+            "gasPrice":str(response["gasProvided"]),
+            "maxFeePerGas":"",
+            "maxPriorityFeePerGas":"",
+            "hash":str(response["hash"]),
+            "input":str(response["inputBytes"]),
+            "nonce":"",
+            "to":str(response["to"]),
+            "transactionIndex":str(response["index"]),
+            "value":"",
+            "type":"",
+            "accessList":[
+
+            ],
+            "chainId":"0x1",
+            "v":"0x0",
+            "r":str(response["previousHash"]),
+            "s":str(response["nextHash"])
+        }
+    }
+    data_json = json.dumps(data)
+    '''
+
+    '''
+    #compressed_response = gzip.compress(json.dumps(response).encode('utf8'))
+    response_format = make_response(json.dumps(response),mimetype='application/json')
+    #response_format.headers['Access-Control-Allow-Origin']=<origin>
+    response_format.headers['Access-Control-Allow-headers']='Content-Type'
+    response_format.headers['Access-Control-Allow-METHODS']='GET, POST, OPTIONS'
+    response_format.headers['connection']='keep-alive'
+    #response_format.headers['Vary']='Accept-Encoding'
+    #response_format.headers['Content-Encoding']='gzip'
+    #response_format.headers['X-Powered-By']='Express'
+    response_format.headers['content-type']='application/json'
+    '''
+    #return response_format
+    return jsonify(response)
 
 @app.route('/', methods=['GET'])
 def home():
@@ -43,6 +112,13 @@ def home():
 #this api creates groups/templates (DONE, only name formatting needs to be changed and images link)
 @app.route('/api/v1/issuer/groups', methods=['POST'])
 def create_group():
+    """
+
+    THIS API IS NOT CALLED FROM KOA CERT GENERATION FILE. (maybe) groups are created when institute makes their group
+
+
+    """
+
     msg=""
 
     #check if request is json so data is not None
@@ -53,9 +129,12 @@ def create_group():
 
     issuer_id_output = "cert-tools/sample_data/issuer_id/"+str(data["group"]["name"]).replace(" ","_")+".json"
     group_name = str(data['group']['name'])
-    #issuer_id_url=  "http://localhost:5000/static/"+group_name+".json"
-    issuer_id_url = "http://localhost:5000/static/edx.json"
-    issuer_pubkey = "0x88D2a0D90B290d7233045E364501F9DD8B3680Cf".lower() #pubkey in cert-tools config file needs to be lower as cert-verifier will fail to check if not. There's a problem in the cert-verifier library that parse the issuer_id pubkey and cert template pubkey as all lowercase. 3 years passed and this bug is still documented as open and unfixed in the github.
+
+    #TODO: Change the issuer_id_url and issuer_pubkey according to the insitute issuer
+    #issuer_id_url=  "http://localhost:5000/issuer_id/"+group_name+".json"
+    issuer_id_url = "http://127.0.0.1:5000/issuer_id/edx.json"
+    issuer_pubkey = "0x88D2a0D90B290d7233045E364501F9DD8B3680Cf".lower()
+    #pubkey in cert-tools config file needs to be lower as cert-verifier (the python one) will fail to check if not. for the js, havem't tested yet
 
     #this below might not be needed if the issuer is only 1 organization (generate sendiri nanti sesuai dari website icei + gambar mereka)
     """
@@ -98,9 +177,9 @@ def create_group():
 
     #currently, the template_file_name is the group id
     template_file_name = "course-v1:"+str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
-    #template_file_name = str(data["group"]["id"])+'.json'
-    #template file name should look like this course-v1:UNSx+MS12304-20B+2021.1
-    cert_conf.set("template data","template_file_name",template_file_name+'.json') #this is set as group name_course name.json. Formatting can be changed
+
+    #template file name should look like this group+name_course+name.json. Formatting can be changed
+    cert_conf.set("template data","template_file_name",template_file_name+'.json')
 
     #write the conf in cert-tools/conf.ini
     with open('cert-tools/conf.ini', 'w') as f:
@@ -114,8 +193,11 @@ def create_group():
         msg="error creating template; "
         msg = msg+str(e)
         return jsonify({"msg":msg})
+
+    #open the created certificate
     with open(dir_path+"/cert-tools/"+cert_conf["template data"]["data_dir"]+"/"+cert_conf["template data"]["template_dir"]+"/"+template_file_name+'.json', 'r') as f:
         return_json = json.load(f)
+    #format the return data so that it's the same as accredible
     value ={
         "groups": {
             "id": template_file_name,
@@ -424,7 +506,7 @@ def search_credential():
     if "group_id" in data:
         group_id = str(data["group_id"])
         group_id_match = group_id+'*.json'
-        course_name = group_id.split('+')[1]
+        course_name = group_id.split("+")[1]
     else:
         group_id=""
     blockchain_cert_dir = os.path.join(dir_path,"cert-issuer/data/blockchain_certificates") #this can be changed to use the dir path in conf.ini
@@ -519,7 +601,7 @@ def generate_pdf(cert_id):
     if  request.is_json:
         #cert_dir = dir_path+'/cert-issuer/data/blockchain_certificates/'+cert_id+'.json'
         return_data = {
-            "file":"localhost:5000/blockchain_certificates/"+cert_id+'.json'
+            "file":"localhost:80/blockchain_certificates/"+cert_id+'.json'
         }
     else:
         return jsonify({"err": "Content type is not json."})
@@ -529,7 +611,7 @@ def generate_pdf(cert_id):
 def send_certificates(filename):
     my_dir = str(dir_path)+"/cert-issuer/data/blockchain_certificates"
     print (my_dir)
-    return send_from_directory(my_dir,filename)
+    return send_from_directory(my_dir,filename,as_attachment=True)
 
 
 if __name__ == "__main__":
