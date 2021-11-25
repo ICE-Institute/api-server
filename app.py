@@ -39,12 +39,14 @@ app = flask.Flask(__name__)
 
 app.config["DEBUG"] = True
 
+'''
 @app.route('/issuer_id/<issuer_id>',methods=['GET'])
 @cross_origin()
 def send_issuerId(issuer_id):
     my_dir = str(dir_path)+"/static"
     print (my_dir)
     return send_from_directory(my_dir,issuer_id)
+'''
 
 @app.route('/api/v1/viewer/<transaction_id>',methods=['GET'])
 @cross_origin()
@@ -52,53 +54,19 @@ def view(transaction_id):
     tx_id = transaction_id
     data_request = request
     print(data_request)
-    my_headers = {'Authorization' : ''}
+    my_headers = {'A' : ''}
     get_data = req.get(""+tx_id,headers=my_headers)
     #print (get_data.json())
     response = get_data.json()
-    #response_obj = response.loads(response)
-
-    '''
-    data = {
-        "jsonrpc":"2.0",
-        "id":1,
-        "result":{
-            "blockHash":str(response["blockHash"]),
-            "blockNumber":str(response["blockNumber"]),
-            "from":str(response["from"]),
-            "gas":"",
-            "gasPrice":str(response["gasProvided"]),
-            "maxFeePerGas":"",
-            "maxPriorityFeePerGas":"",
-            "hash":str(response["hash"]),
-            "input":str(response["inputBytes"]),
-            "nonce":"",
-            "to":str(response["to"]),
-            "transactionIndex":str(response["index"]),
-            "value":"",
-            "type":"",
-            "accessList":[
-
-            ],
-            "chainId":"0x1",
-            "v":"0x0",
-            "r":str(response["previousHash"]),
-            "s":str(response["nextHash"])
-        }
-    }
-    data_json = json.dumps(data)
-    '''
 
     '''
     #compressed_response = gzip.compress(json.dumps(response).encode('utf8'))
     response_format = make_response(json.dumps(response),mimetype='application/json')
-    #response_format.headers['Access-Control-Allow-Origin']=<origin>
     response_format.headers['Access-Control-Allow-headers']='Content-Type'
     response_format.headers['Access-Control-Allow-METHODS']='GET, POST, OPTIONS'
     response_format.headers['connection']='keep-alive'
     #response_format.headers['Vary']='Accept-Encoding'
     #response_format.headers['Content-Encoding']='gzip'
-    #response_format.headers['X-Powered-By']='Express'
     response_format.headers['content-type']='application/json'
     '''
     #return response_format
@@ -114,8 +82,7 @@ def home():
 def create_group():
     """
 
-    THIS API IS NOT CALLED FROM KOA CERT GENERATION FILE. (maybe) groups are created when institute makes their group
-
+    THIS API IS NOT CALLED FROM KOA CERT GENERATION FILE. Perhaps groups are created when institutes makes their group/course
 
     """
 
@@ -128,11 +95,11 @@ def create_group():
         return jsonify({"msg":"data does not have content type application/json!"})
 
     issuer_id_output = "cert-tools/sample_data/issuer_id/"+str(data["group"]["name"]).replace(" ","_")+".json"
-    group_name = str(data['group']['name'])
+    group_name = str(data['group']['name']).lower()
 
-    #TODO: Change the issuer_id_url and issuer_pubkey according to the insitute issuer
-    #issuer_id_url=  "http://localhost:5000/issuer_id/"+group_name+".json"
-    issuer_id_url = "http://127.0.0.1:5000/issuer_id/edx.json"
+    #Change the issuer_id_url and issuer_pubkey according to the insitute issuer
+    issuer_id_url=  "https://52.139.231.180/issuer_id/"+group_name+".json"
+    #issuer_id_url = "http://127.0.0.1:5000/issuer_id/edx.json"
     issuer_pubkey = "0x88D2a0D90B290d7233045E364501F9DD8B3680Cf".lower()
     #pubkey in cert-tools config file needs to be lower as cert-verifier (the python one) will fail to check if not. for the js, havem't tested yet
 
@@ -175,10 +142,10 @@ def create_group():
     cert_conf.set("certificate information","criteria_narrative",str(data["group"]["course_description"])) #currently set equal with certificate description
     #cert_conf.set("certificate information","badge_id",str(data["group"]["department_id"])) #dont know what to input. This is required by cert-tools, currently set to default from the blockcerts github
 
-    #currently, the template_file_name is the group id
+    #currently, the template_file_name is formatted as group id in the return part
     template_file_name = "course-v1:"+str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
 
-    #template file name should look like this group+name_course+name.json. Formatting can be changed
+    #template file name should look like this "course-v1:group+name_course+name.json". Formatting can be changed
     cert_conf.set("template data","template_file_name",template_file_name+'.json')
 
     #write the conf in cert-tools/conf.ini
@@ -223,7 +190,7 @@ def create_group():
     }
     return jsonify(value)
 
-#this api finds 1 group
+#this api finds groups
 @app.route('/api/v1/groups/search', methods = ['POST'])
 def search_group():
     if request.is_json:
@@ -240,16 +207,13 @@ def search_group():
         }
 
     try:
-        #with open('cert-tools/sample_data/certificate_templates/'+cert_id+'.json', 'r') as myfile:
-            #group_data = myfile.read()
-        #group_json=json.loads(group_data)
         folder = dir_path+'/cert-tools/sample_data/certificate_templates/'
         print (folder)
         for filename in os.listdir(folder):
             file_path = os.path.join(folder,filename)
             if cert_id == filename.lower():
                 cert_path = file_path
-                print (cert_path)
+                print ('This is cert_path in search group: 'cert_path)
                 with open(cert_path, 'r') as f:
                     group_json = json.load(f)
                 identity = str(group_json["badge"]["id"])
@@ -279,10 +243,6 @@ def search_group():
 
     except:
         return jsonify({"msg":"No group data exist!"})
-
-
-
-    #this returns 1 result only
 
     return jsonify(group)
 
@@ -392,7 +352,7 @@ def create_certificate():
 
     #find the newly created blockchain certificate
     recipient_name_return = recipient_email.replace("@","").replace(".","")
-    recipient_name_return_sanitize = ''.join(e for e in recipient_name_return if e.isalnum())
+    recipient_name_return_sanitize = ''.join(e for e in recipient_name_return if e.isalnum()) #sanitize so that it can find the blockchain certificate as the certificate file is cleaned by cert-issuer
     course_name_return = group_id.split('+')[1].replace("_","")
     #course_name_return = course_name_return.split('_')[1]
     blockchain_file = course_name_return+recipient_name_return_sanitize+".json"
@@ -404,7 +364,7 @@ def create_certificate():
             if blockchain_file.strip() == filename.lower():
                 blockchain_link = file_path
                 break
-        print (blockchain_file)
+        print ("blockchain file location is: "+blockchain_file)
         with open(blockchain_link, 'r') as f:
             return_json = json.load(f)
     except:
@@ -510,7 +470,7 @@ def search_credential():
     else:
         group_id=""
     blockchain_cert_dir = os.path.join(dir_path,"cert-issuer/data/blockchain_certificates") #this can be changed to use the dir path in conf.ini
-    print (blockchain_cert_dir)
+    print ('blockchain certificate directory is: '+blockchain_cert_dir)
     blockchain_cert_data={
             "credentials":[]
         }
@@ -523,7 +483,7 @@ def search_credential():
         if group_id!="":
             if cert_id==filename:
                 file_dir = blockchain_cert_dir+"/"+x
-                print (file_dir)
+                print ('file directory is: '+file_dir)
                 with open(file_dir,'r') as f:
                    data=json.load(f)
                 formatting = {
@@ -559,7 +519,7 @@ def search_credential():
         else:
             if fnmatch.fnmatch(filename,recipient_email_match):
                 file_dir = blockchain_cert_dir+"/"+x
-                print(file_dir)
+                print('file directory is: 'file_dir)
                 with open(file_dir,'r') as f:
                     data=json.load(f)
                 formatting = {
@@ -610,7 +570,7 @@ def generate_pdf(cert_id):
 @app.route('/blockchain_certificates/<path:filename>')
 def send_certificates(filename):
     my_dir = str(dir_path)+"/cert-issuer/data/blockchain_certificates"
-    print (my_dir)
+    print ('my dir for send_certificates is: '+my_dir)
     return send_from_directory(my_dir,filename,as_attachment=True)
 
 
