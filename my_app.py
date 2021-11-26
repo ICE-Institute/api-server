@@ -56,8 +56,8 @@ def view(transaction_id):
     tx_id = transaction_id
     data_request = request
     print(data_request)
-    my_headers = {'Authorization' : 'Bearer u0kx338qr6-Q2/MX442ctJlPUv6oxA5xuFKGB+sCQ7ETvU1rRtNXug='}
-    get_data = req.get("https://console-ko.kaleido.io/api/v1/ledger/k0x6srlto8/k0zsrefonj/transactions/"+tx_id,headers=my_headers)
+    my_headers = {'Authorization' : 'Bearer '}
+    get_data = req.get(""+tx_id,headers=my_headers)
     #print (get_data.json())
     response = get_data.json()
 
