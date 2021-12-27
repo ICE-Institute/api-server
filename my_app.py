@@ -35,9 +35,8 @@ dir_path=os.path.abspath(os.getcwd())
 app = flask.Flask(__name__)
 
 app.config["DEBUG"] = True
- '''
-
- # The static file is set to be served with nginx, so this is not needed
+'''
+# The static file is set to be served with nginx, so this is not needed
 @app.route('/issuer_id/<issuer_id>',methods=['GET'])
 @cross_origin()
 def send_issuerId(issuer_id):
@@ -55,7 +54,7 @@ def view(transaction_id):
     tx_id = transaction_id
     data_request = request
     print(data_request)
-    my_headers = {'Authorization' : 'Bearer '}
+    my_headers = {'Authorization' : 'Bearer  '}
     get_data = req.get("https://console-ko.kaleido.io/api/v1/ledger/k0x6srlto8/k0zsrefonj/transactions/"+tx_id,headers=my_headers)
     #print (get_data.json())
     response = get_data.json()
@@ -208,7 +207,7 @@ def search_group():
             file_path = os.path.join(folder,filename)
             if cert_id == filename.lower():
                 cert_path = file_path
-                print ('This is cert_path in search group: 'cert_path)
+                print ('This is cert_path in search group: '+cert_path)
                 with open(cert_path, 'r') as f:
                     group_json = json.load(f)
                 identity = str(group_json["badge"]["id"])
@@ -446,8 +445,8 @@ def create_certificate():
         "meta_data": {
             "foo": "bar"
         }
-        }
     }
+}
 
     return jsonify(return_data)
 
@@ -524,7 +523,7 @@ def search_credential():
         else:
             if fnmatch.fnmatch(filename,recipient_email_match):
                 file_dir = blockchain_cert_dir+"/"+x
-                print('file directory is: 'file_dir)
+                print('file directory is: '+file_dir)
                 with open(file_dir,'r') as f:
                     data=json.load(f)
                 formatting = {
