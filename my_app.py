@@ -25,9 +25,6 @@ Required library are stated above
 Some validation haven't been done, some are still hard coded, no authorization token yet, currently works according to the postman usage.
 Installation should be as easy: creat venv in the app.py folder, then navigate 1 by 1 to the blockcert app and use pip install -r requirements.txt. for cert-issuer, follow the steps in the cert-issuer github + pip install -r requirements.txt AND pip install -r ethereum_requirements.txt
 
-To-DO:
-- manage inputs from openEDX to be written to conf.ini, referencing from accredible API <-- should be done
-- manage return to match accredible api output <-- should be done
 """
 
 
@@ -40,8 +37,7 @@ app = flask.Flask(__name__)
 app.config["DEBUG"] = True
  '''
 
- # This static file is set to be served with nginx
-
+ # The static file is set to be served with nginx, so this is not needed
 @app.route('/issuer_id/<issuer_id>',methods=['GET'])
 @cross_origin()
 def send_issuerId(issuer_id):
@@ -53,24 +49,17 @@ def send_issuerId(issuer_id):
 @app.route('/api/v1/viewer/<transaction_id>',methods=['GET'])
 @cross_origin()
 def view(transaction_id):
+    '''
+    This acts as a proxy between cert-verifier and kaleido so that the bearer token can be used
+    '''
     tx_id = transaction_id
     data_request = request
     print(data_request)
     my_headers = {'Authorization' : 'Bearer '}
-    get_data = req.get(""+tx_id,headers=my_headers)
+    get_data = req.get("https://console-ko.kaleido.io/api/v1/ledger/k0x6srlto8/k0zsrefonj/transactions/"+tx_id,headers=my_headers)
     #print (get_data.json())
     response = get_data.json()
 
-    '''
-    #compressed_response = gzip.compress(json.dumps(response).encode('utf8'))
-    response_format = make_response(json.dumps(response),mimetype='application/json')
-    response_format.headers['Access-Control-Allow-headers']='Content-Type'
-    response_format.headers['Access-Control-Allow-METHODS']='GET, POST, OPTIONS'
-    response_format.headers['connection']='keep-alive'
-    #response_format.headers['Vary']='Accept-Encoding'
-    #response_format.headers['Content-Encoding']='gzip'
-    response_format.headers['content-type']='application/json'
-    '''
     #return response_format
     return jsonify(response)
 
@@ -79,13 +68,12 @@ def home():
     return "<h1>Testing API for open edx integration with blockcerts</h1><p>This site is a prototype API for open edx integration with blockcerts</p>"
 
 
-#this api creates groups/templates (DONE, only name formatting needs to be changed and images link)
+
 @app.route('/api/v1/issuer/groups', methods=['POST'])
 def create_group():
     """
-
-    THIS API IS NOT CALLED FROM KOA CERT GENERATION FILE. Perhaps groups are created when institutes makes their group/course
-
+    THIS FUNCTION IS NOT CALLED FROM KOA CERT GENERATION FILE. Perhaps groups are created when institutes makes their group/course
+    :return :(json)
     """
 
     msg=""
@@ -147,7 +135,7 @@ def create_group():
     #currently, the template_file_name is formatted as group id in the return part
     template_file_name = "course-v1:"+str(data["group"]["name"]).replace(" ","_").lower()+"+"+str(data["group"]["course_name"]).replace(" ","_").lower()
 
-    #template file name should look like this "course-v1:group+name_course+name.json". Formatting can be changed
+    #template file name should look like this "course-v1:group+name_course+name.json".
     cert_conf.set("template data","template_file_name",template_file_name+'.json')
 
     #write the conf in cert-tools/conf.ini
@@ -166,6 +154,7 @@ def create_group():
     #open the created certificate
     with open(dir_path+"/cert-tools/"+cert_conf["template data"]["data_dir"]+"/"+cert_conf["template data"]["template_dir"]+"/"+template_file_name+'.json', 'r') as f:
         return_json = json.load(f)
+
     #format the return data so that it's the same as accredible
     value ={
         "groups": {
@@ -192,9 +181,13 @@ def create_group():
     }
     return jsonify(value)
 
-#this api finds groups
+
 @app.route('/api/v1/groups/search', methods = ['POST'])
 def search_group():
+    """
+    This function searches group in the specified folder
+    :return :(json)
+    """
     if request.is_json:
         data = request.json
     else:
@@ -248,9 +241,13 @@ def search_group():
 
     return jsonify(group)
 
-#This api create certificate in cert-tools and issue it automatically to blockchain. Writing the blockchain config is not yet made/not neccessary if issuer is only 1
+
 @app.route('/api/v1/credentials', methods=['POST'])
 def create_certificate():
+    """
+    This api create certificate in cert-tools and issue it automatically to blockchain. Editing the blockchain config is not yet made/not neccessary if issuer is only 1
+    :return :(json)
+    """
     #Gets data from api call
     if request.is_json:
         data = request.json
@@ -305,12 +302,12 @@ def create_certificate():
 
     #create certificate from csv
     try:
-
-        run_cert_tools = subprocess.run(['instantiate-certificate-batch','-c','cert-tools/conf.ini']) #can add '-c','myconf.ini' after 'instantiate-certificate-batch' to the conf file if this failed
+        run_cert_tools = subprocess.run(['instantiate-certificate-batch','-c','cert-tools/conf.ini'])
         print("instantiate succeed!")
         unsigned_dir_temp = dir_path+'/cert-tools/'+str(cert_conf["template data"]["data_dir"])+"/"+str(cert_conf["instantiate batch config"]["unsigned_certificates_dir"])
+
         """
-        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-issuer/data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-issuer folder to be proccessed, only in python 3.8+ :(
+        shutil.copytree(unsigned_dir_temp,dir_path+"/cert-issuer/data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-issuer folder to be proccessed, only in python 3.8+
         shutil.copytree(unsigned_dir_temp,dir_path+"/cert-tools/sample_data/unsigned_certificates",dirs_exist_ok=True) #copy temp file to cert-tools folder for storage, only in python 3.8+
         """
         copy_tree(str(unsigned_dir_temp), str(dir_path)+'/cert-issuer/data/unsigned_certificates')
@@ -338,6 +335,7 @@ def create_certificate():
     try:
         run_cert_issuer = subprocess.run(['cert-issuer','-c','cert-issuer/conf.ini'])
         print("success issuing!")
+
         #this function deletes unsigned certificates in cert-issuer (issue to blockchain from the folder specified in cert-issuer/conf.ini). Because of how cert-issuer read from unsigned_certificates every issuing, this folder needs to be cleaned so previously signed certificate not get issued again
         folder = os.path.join(dir_path,'cert-issuer/data/unsigned_certificates')
         for filename in os.listdir(folder):
@@ -371,6 +369,7 @@ def create_certificate():
             return_json = json.load(f)
     except:
         return jsonify({"msg":"cannot find blockchain certificates / Error when issuing certificate!"})
+
     return_data = {
         "credential": {
             "id": str(return_json["id"]).split(":")[2],
@@ -447,14 +446,18 @@ def create_certificate():
         "meta_data": {
             "foo": "bar"
         }
+        }
     }
-}
 
     return jsonify(return_data)
 
-#this api search certificates
+
 @app.route('/api/v1/credentials/search', methods=['POST'])
 def search_credential():
+    """
+    This function searches for credentials in the specified folder
+    :return :(json)
+    """
     if  request.is_json:
         data=request.json
     else:
@@ -557,9 +560,14 @@ def search_credential():
 
     return jsonify(blockchain_cert_data)
 
-#this api shows certificate by json as blockcert doesn't generate pdf
+
 @app.route('/api/v1/credentials/generate_single_pdf/<cert_id>', methods=['POST'])
 def generate_pdf(cert_id):
+    """
+    This function send json data of the locatino of json certificate file to requester
+    :params cert_id:(string/int)
+    :return :(json)
+    """
     if  request.is_json:
         #cert_dir = dir_path+'/cert-issuer/data/blockchain_certificates/'+cert_id+'.json'
         return_data = {
@@ -571,6 +579,10 @@ def generate_pdf(cert_id):
 
 @app.route('/blockchain_certificates/<path:filename>')
 def send_certificates(filename):
+    """
+    This funcition sends certificate as a download prompt to requester
+    :returns :(json)
+    """
     my_dir = str(dir_path)+"/cert-issuer/data/blockchain_certificates"
     print ('my dir for send_certificates is: '+my_dir)
     return send_from_directory(my_dir,filename,as_attachment=True)
